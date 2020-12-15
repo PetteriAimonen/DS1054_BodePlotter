@@ -6,6 +6,7 @@
 
 
 from jds6600 import *
+import dft
 
 import numpy as np
 import time
@@ -29,6 +30,7 @@ parser.add_argument("--step_time", dest="TIMEOUT", default=0.00, type=float, hel
 parser.add_argument("--phase", dest="PHASE", action="store_true", help="Set this flag if you want to plot the Phase diagram too")
 parser.add_argument("--no_smoothing", dest="SMOOTH", action="store_false", help="Set this to disable the smoothing of the data with a Savitzky–Golay filter")
 parser.add_argument("--use_manual_settings", dest="MANUAL_SETTINGS", action="store_true", help="When this option is set, the options on the oscilloscope for voltage and time base are not changed by this program.")
+parser.add_argument("--use_dft", dest="DFT", action="store_true", help="Use Discrete Fourier Transform on raw data; more accurate but slower.")
 parser.add_argument("--output", dest="file", type=argparse.FileType("w"), help="Write the measured data to the given CSV file.")
 parser.add_argument("--no_plots", dest="PLOTS", action="store_false", help="When this option is set no plots are shown. Useful in combination with --output")
 parser.add_argument("--normalize", dest="NORMALIZE", action="store_true", help="Set this option if you dont want to get the absolute voltage levels on the output, but the value normalized on the input level.")
@@ -119,13 +121,24 @@ for freq in freqs:
     awg.setfrequency(AWG_CHANNEL, float(freq))
     time.sleep(TIMEOUT)
 
-    if not args.NORMALIZE:
-        volt = scope.get_channel_measurement(2, 'vpp')
-        volts.append(volt)
+    if args.DFT:
+        volt0, volt, phase = dft.measure_with_dft(scope, freq)
     else:
         volt0 = scope.get_channel_measurement(1, 'vpp')
         volt = scope.get_channel_measurement(2, 'vpp')
+        phase = scope.get_channel_measurement('CHAN1, CHAN2', 'rphase')
+
+        if phase:
+            phase = -phase
+
+    if not args.NORMALIZE:
+        volts.append(volt)
+    else:
         volts.append(volt/volt0)
+
+    # Measure phase
+    if args.PHASE:
+        phases.append(phase)
 
     # Use a better timebase
     if not args.MANUAL_SETTINGS:
@@ -138,13 +151,6 @@ for freq in freqs:
             scope.set_channel_scale(2, volt / 2, use_closest_match=True)
         else:
             scope.set_channel_scale(2, AWG_VOLT / 2, use_closest_match=True)
-
-    # Measure phase
-    if args.PHASE:
-        phase = scope.get_channel_measurement('CHAN1, CHAN2', 'rphase')
-        if phase:
-            phase = -phase
-        phases.append(phase)
 
     print(freq)
 
