@@ -88,6 +88,11 @@ if not args.MANUAL_SETTINGS:
     scope.set_channel_offset(1, 0)
     scope.set_channel_offset(2, 0)
 
+    # Display one period in 3 divs
+    period = (1/MIN_FREQ) / 3
+    scope.timebase_scale = period
+    scope.run()
+
     # Set the sensitivity according to the selected voltage
     scope.set_channel_scale(1, args.VOLTAGE / 3, use_closest_match=True)
     # Be a bit more pessimistic for the default voltage, because we run into problems if it is too confident
